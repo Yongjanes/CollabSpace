@@ -1,0 +1,22 @@
+{
+    "name": "collabspace",
+    "version": "1.0.0",
+    "description": "A production-ready backend for real-time team collaboration, supporting multi-workspace management, role-based access control, task tracking, and live updates using WebSockets. Designed with scalability, security, and performance in mind.",
+    "license": "ISC",
+    "author": "Rohit Pali",
+    "type": "module",
+    "main": "index.js",
+    "scripts": {
+        "lint": "eslint .",
+        "lint:fix": "eslint . --fix",
+        "format": "prettier --write ."
+    },
+    "devDependencies": {
+        "eslint": "^9.39.2",
+        "eslint-config-prettier": "^10.1.8",
+        "eslint-plugin-import": "^2.32.0",
+        "eslint-plugin-node": "^11.1.0",
+        "eslint-plugin-prettier": "^5.5.4",
+        "prettier": "^3.7.4"
+    }
+}
