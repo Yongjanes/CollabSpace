@@ -7,6 +7,8 @@
     "type": "module",
     "main": "index.js",
     "scripts": {
+        "dev": "node --watch --env-file=.env src/index.js",
+        "start": "node --env-file=.env src/index.js",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
         "format": "prettier --write ."
@@ -18,5 +20,11 @@
         "eslint-plugin-node": "^11.1.0",
         "eslint-plugin-prettier": "^5.5.4",
         "prettier": "^3.7.4"
+    },
+    "dependencies": {
+        "cookie-parser": "^1.4.7",
+        "cors": "^2.8.5",
+        "express": "^5.2.1",
+        "mongoose": "^9.0.2"
     }
 }

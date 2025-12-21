@@ -1,3 +1,3 @@
-for (let i = 0; i < 10; i++) {
-    console.log(i);
-}
+import { connectDB } from "./db/index.js"
+
+connectDB()
