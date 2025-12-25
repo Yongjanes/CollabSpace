@@ -42,5 +42,7 @@ const requireAuth = asyncHandler( async (req, _, next) => {
 
     // 5. next()
     next();
-    
+
 })
+
+export { requireAuth }
