@@ -5,10 +5,3 @@
 
 
 
-
-
-
-### DUE WORK
-
-
-- Complete requireAuth function

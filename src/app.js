@@ -14,4 +14,17 @@ app.use(express.urlencoded({ extended: true }))
 app.use(express.static("public"))
 app.use(cookieParser())
 
+
+
+// import routers
+
+import { WorkspaceRouter } from './routes/workspace.routes.js'
+
+
+// use routers
+
+app.use('/api/v1/workspaces', WorkspaceRouter)
+
+
+
 export { app }
