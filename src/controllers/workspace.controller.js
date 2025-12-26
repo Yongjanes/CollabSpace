@@ -388,4 +388,98 @@ const removeWorkspaceMember = asyncHandler( async (req, res) => {
         )
 })
 
-export { createWorkspace, getMyWorkspaces, getWorkspaceById, addWorkspaceMember, getWorkspaceMembers, updateWorkspaceMemberRole, removeWorkspaceMember }
+const updateWorkspace = asyncHandler( async (req, res) => {
+    const { id: workspaceId } = req.params
+    const { name, description, isActive } = req.body
+
+    if (!mongoose.Types.ObjectId.isValid(workspaceId)) {
+        throw new ApiError(400, "Invalid workspace id")
+    }
+
+    if (name === undefined && description === undefined && isActive === undefined) {
+        throw new ApiError(400, 'At least one field must be provided')
+    }
+
+    const requesterMembership = await requireWorkspaceMember(req.user._id, workspaceId)
+
+    requireWorkspaceRole(requesterMembership, ['owner', 'admin'])
+
+    const workspace = await Workspace.findById(workspaceId)
+
+    if (!workspace) {
+        throw new ApiError(404, 'Workspace not found')
+    }
+
+    if (name !== undefined) {
+        if (!name.trim()) {
+            throw new ApiError(400, 'Workspace name cannot be empty')
+        }
+
+        workspace.name = name
+    }
+
+    if (description !== undefined) {
+        workspace.description = description
+    }
+
+
+    if (isActive !== undefined) {
+        if (requesterMembership.role !== 'owner') {
+            throw new ApiError(403, 'Only owners can archive a workspace')
+        }
+
+        workspace.isActive = isActive
+    }
+
+    await workspace.save()
+
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(
+                200,
+                'Workspace updated successfully',
+                workspace
+            )
+        )
+})
+
+const deleteWorkspace  = asyncHandler( async (req, res) => {
+    const { id: workspaceId } = req.params
+
+    if (!mongoose.Types.ObjectId.isValid(workspaceId)) {
+        throw new ApiError(400, "Invalid workspace id")
+    }
+
+    const requesterMembership = await requireWorkspaceMember(req.user._id, workspaceId)
+
+    requireWorkspaceRole(requesterMembership, ['owner'])
+
+    const workspace = await Workspace.findById(workspaceId)
+
+    if (!workspace) {
+        throw new ApiError(404, 'Workspace not found')
+    }
+
+    if (!workspace.isActive) {
+        throw new ApiError(400, 'Workspace is already archived')
+    }
+
+    workspace.isActive = false
+
+    await workspace.save()
+
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(
+                200,
+                'Workspace archived successfully',
+                {
+                    workspaceId: workspaceId
+                }
+            )
+        )
+})
+
+export { createWorkspace, getMyWorkspaces, getWorkspaceById, addWorkspaceMember, getWorkspaceMembers, updateWorkspaceMemberRole, removeWorkspaceMember, updateWorkspace, deleteWorkspace }

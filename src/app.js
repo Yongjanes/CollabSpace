@@ -18,12 +18,14 @@ app.use(cookieParser())
 
 // import routers
 
-import { WorkspaceRouter } from './routes/workspace.routes.js'
+import { workspaceRouter } from './routes/workspace.routes.js'
+import { taskRouter } from './routes/task.routes.js'
 
 
 // use routers
 
-app.use('/api/v1/workspaces', WorkspaceRouter)
+app.use('/api/v1/workspaces', workspaceRouter)
+app.use('/api/v1/tasks', taskRouter)
 
 
 

@@ -150,8 +150,51 @@ Errors:
 - 403 insufficient permissions
 - 404 user not a workspace member
 
+-------------------------------------------------------------------
 
+## Update Workspace
 
+PATCH /workspaces/:id  
+Auth: Required
+
+Params:
+- id: workspaceId
+
+Request Body (any):
+- name (string)
+- description (string)
+- isActive (boolean, owner-only)
+
+Authorization:
+- Owner & admin may update name/description
+- Only owner may archive workspace
+
+Errors:
+- 400 invalid id or empty update
+- 403 insufficient permissions
+- 404 workspace not found
+
+-------------------------------------------------------------------
+
+## Delete (Archive) Workspace
+
+DELETE /workspaces/:id  
+Auth: Required
+
+Params:
+- id: workspaceId
+
+Authorization:
+- Only workspace owner can delete
+
+Behavior:
+- Soft deletes the workspace (isActive = false)
+- Existing data remains intact
+
+Errors:
+- 400 invalid id or already archived
+- 403 insufficient permissions
+- 404 workspace not found
 
 -------------------------------------------------------------------
 
