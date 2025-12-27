@@ -19,4 +19,12 @@ taskRouter.route('/:id').patch(updateTask)
 taskRouter.route('/:id').delete(deleteTask)
 
 
+
+// comments Route Redirection
+
+import { commentRouter } from './comment.routes.js'
+
+taskRouter.use('/:id/comments', commentRouter)
+
+
 export { taskRouter }
