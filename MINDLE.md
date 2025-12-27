@@ -197,8 +197,27 @@ User ──┘           │
 
 
 
-
-
-
-
+1️⃣ API DOCUMENTATION
+2️⃣ PAGINATION & PERFORMANCE POLISH
+  - Add limit, page
+  - Add indexes review
+  - Cursor vs offset discussion
+3️⃣ AUTH SYSTEM COMPLETION
+- POST /auth/register
+- POST /auth/login
+- POST /auth/refresh
+- Token rotation
+- Logout
+4️⃣ ACTIVITY LOGS / AUDIT TRAIL
+Example:
+- “Alice created a task”
+- “Bob changed task status”
+- “Workspace archived”
+5️⃣ TESTING
+- Unit tests for controllers
+- Permission edge cases
+6️⃣ DEPLOYMENT (Bonus)
+- Dockerfile
+- .env.example
+- Railway / Render / Fly.io
 

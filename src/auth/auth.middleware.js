@@ -1,7 +1,7 @@
 import { ApiError } from '../utils/ApiError.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import jwt from 'jsonwebtoken'
-import { User } from '../models/User.js'
+import { User } from '../models/user.model.js'
 
 const requireAuth = asyncHandler( async (req, _, next) => {
     // 1. Get token
