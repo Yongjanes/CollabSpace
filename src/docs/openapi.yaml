@@ -1,0 +1,153 @@
+openapi: 3.0.0
+
+info:
+  title: Workspace Collaboration API
+  description: |
+    Backend API for managing workspaces, members, tasks, and comments.
+    Includes role-based permissions and authentication.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development server
+
+tags:
+  - name: Auth
+    description: Authentication & authorization
+  - name: Workspaces
+    description: Workspace management
+  - name: Members
+    description: Workspace members & roles
+  - name: Tasks
+    description: Task management
+  - name: Comments
+    description: Task comments
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Workspace:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: "64a1f0c2e4b0"
+        name:
+          type: string
+          example: "My Workspace"
+        description:
+          type: string
+          example: "A team collaboration workspace"
+        createdBy:
+          type: string
+          example: "64a1f0c2e4b0"
+        isActive:
+          type: boolean
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+          example: "2024-06-15T12:34:56Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2024-06-20T08:22:10Z"
+    ApiResponse:
+      type: object
+      properties:
+        statusCode:
+          type: number
+          example: 200
+        message:
+          type: string
+          example: "Workspace has been updated successfully"
+        data:
+          type: object
+          nullable: true
+
+
+security:
+  - bearerAuth: []
+
+paths:
+  /workspaces:
+    post:
+      tags:
+        - Workspaces
+      summary: Create a new Workspace
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  example: Backend Engineering Team
+                description:
+                  type: string
+                  example: workspace for backend team members
+      responses:
+        201:
+          description: Workspace created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Workspace'
+        400:
+          description: Validation Error
+        401:
+          description: Unauthorized
+        409:
+          description: Workspace already exists
+    get:
+      tags:
+        - Workspaces
+      summary: Get all workspaces of the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Workspaces fetched successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            role:
+                              type: string
+                              example: owner
+                            workspace:
+                              $ref: '#/components/schemas/Workspace'
+                          type: object
+                          properties:
+                            role: 
+                              type: string
+                              example: members
+                            workspace:
+                              $ref: '#/components/schemas/Workspace'
+                              name: Frontend engineering team
+        401:
+          descriptiom: Unauthorized
+  

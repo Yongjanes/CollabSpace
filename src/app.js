@@ -1,6 +1,8 @@
 import express from "express"
 import cors from "cors"
 import cookieParser from "cookie-parser"
+import swaggerUi from 'swagger-ui-express'
+import YAML from 'yamljs'
 
 const app = express()
 
@@ -14,19 +16,20 @@ app.use(express.urlencoded({ extended: true }))
 app.use(express.static("public"))
 app.use(cookieParser())
 
+// swagger docs route
 
+const swaggerDocument = YAML.load('./src/docs/openapi.yaml')
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument))
 
 // import routers
 
 import { workspaceRouter } from './routes/workspace.routes.js'
 import { taskRouter } from './routes/task.routes.js'
 
-
 // use routers
 
 app.use('/api/v1/workspaces', workspaceRouter)
 app.use('/api/v1/tasks', taskRouter)
-
-
 
 export { app }

@@ -6,14 +6,11 @@ import { createWorkspace, getMyWorkspaces, getWorkspaceById, addWorkspaceMember,
 
 const workspaceRouter = Router()
 
-
 // Public Routes (No Auth)
-
 
 
 // Protected Routes (Auth Required)
 workspaceRouter.use(requireAuth)
-
 
 workspaceRouter.route('/').post(createWorkspace)
 workspaceRouter.route('/').get(getMyWorkspaces)
