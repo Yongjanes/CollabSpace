@@ -30,45 +30,221 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
-    Workspace:
+    User:
       type: object
       properties:
         _id:
           type: string
-          example: "64a1f0c2e4b0"
+          description: MongoDB ObjectId
+          example: "64a7f0c2e4b0c8b1a2d3e4f5"
         name:
           type: string
-          example: "My Workspace"
+          example: Alice
+        email:
+          type: string
+          format: email
+          example: alice@example.com
+    Workspace:
+      type: object
+      properties:
+        _id: 
+          type: string
+          description: MongoDB ObjectId
+          example: "64a7f0c2e4b0c8b1a2d3e4f5"
+        name:
+          type: string
+          example: Backend Engineering Team
         description:
           type: string
-          example: "A team collaboration workspace"
+          example: Workspace for backend engineers
         createdBy:
           type: string
-          example: "64a1f0c2e4b0"
+          description: MongoDB ObjectId of the creator
+          example: "64a7f0c2e4b0c8b1a2d3e4f5"
         isActive:
           type: boolean
           example: true
         createdAt:
           type: string
           format: date-time
-          example: "2024-06-15T12:34:56Z"
+          example: "2024-12-29T10:30:00Z"
         updatedAt:
           type: string
           format: date-time
-          example: "2024-06-20T08:22:10Z"
+          example: "2024-12-29T10:30:00Z"
+    WorkspaceMember:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        role:
+          type: string
+          enum: [owner, admin, member, viewer]
+          example: member
+        joinedAt:
+          type: string
+          format: date-time
+          example: "2024-12-29T10:30:00Z"
+    Task:
+      type: object
+      properties:
+        _id:
+          type: string
+          description: MongoDB ObjectId
+          example: "64a7f0c2e4b0c8b1a2d3e4f5"
+        workspaceId:
+          type: string
+          description: MongoDB ObjectId
+          example: "64a7f0c2e4b0c8b1a2d3e4f5"
+        title:
+          type: string
+          example: Implement authentication
+        description:
+          type: string
+          example: Add JWT-based auth middleware
+        status:
+          type: string
+          enum: [todo, in-progress, done]
+          example: todo
+        priority:
+          type: string
+          enum: [low, medium, high]
+          example: medium
+        assignedTo:
+          $ref: '#/components/schemas/User'
+          nullable: true
+        createdBy:
+          $ref: '#/components/schemas/User'
+        createdAt:
+          type: string
+          format: date-time
+          example: "2024-12-29T10:30:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2024-12-29T10:30:00Z"
+    Comment:
+      type: object
+      properties:
+        _id: 
+          type: string
+          description: MongoDB ObjectId
+          example: "64a7f0c2e4b0c8b1a2d3e4f5"
+        taskId:
+          type: string
+          description: MongoDB ObjectId
+          example: "64a7f0c2e4b0c8b1a2d3e4f5"
+        workspaceId:
+          type: string
+          description: MongoDB ObjectId
+          example: "64a7f0c2e4b0c8b1a2d3e4f5"
+        author:
+          $ref: '#/components/schemas/User'
+        content:
+          type: string
+          example: We should refactor this logic.
+        createdAt:
+          type: string
+          format: date-time
+          example: "2024-12-29T10:30:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2024-12-29T10:30:00Z"
     ApiResponse:
       type: object
       properties:
-        statusCode:
-          type: number
-          example: 200
-        message:
-          type: string
-          example: "Workspace has been updated successfully"
+        success:
+          type: boolean
+          example: true
         data:
           type: object
-          nullable: true
-
+        message:
+          type: string
+          example: "Operation completed successfully"
+    ApiResponseWorkspace:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/Workspace'
+    ApiResponseWorkspaceArray:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                type: object
+                properties:
+                  workspace:
+                    $ref: '#/components/schemas/Workspace'
+                  role:
+                    type: string
+                    enum: [owner, admin, member, viewer]
+    ApiResponseWorkspaceWithRole:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                workspace:
+                  $ref: '#/components/schemas/Workspace'
+                role:
+                  type: string
+                  enum: [owner, admin, member, viewer]
+    ApiResponseWorkspaceMember:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/WorkspaceMember'
+    ApiResponseWorkspaceMemberArray:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/WorkspaceMember'
+    ApiResponseTask:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/Task'
+    ApiResponseTaskArray:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Task'
+    ApiResponseComment:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/Comment'
+    ApiResponseCommentArray:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Comment'
 
 security:
   - bearerAuth: []
@@ -78,7 +254,8 @@ paths:
     post:
       tags:
         - Workspaces
-      summary: Create a new Workspace
+      summary: Create a workspace
+      description: Create a new workspace. The authenticated user becomes the owner.
       security:
         - bearerAuth: []
       requestBody:
@@ -95,29 +272,25 @@ paths:
                   example: Backend Engineering Team
                 description:
                   type: string
-                  example: workspace for backend team members
+                  example: Workspace for backend engineers
       responses:
         201:
           description: Workspace created successfully
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/Workspace'
+                $ref: '#/components/schemas/ApiResponseWorkspace'
         400:
-          description: Validation Error
+          description: Workspace name is required
         401:
           description: Unauthorized
         409:
-          description: Workspace already exists
+          description: Workspace with the same name already exists
     get:
       tags:
         - Workspaces
-      summary: Get all workspaces of the authenticated user
+      summary: Get my workspaces
+      description: Fetch all workspaces the authenticated user is a member of
       security:
         - bearerAuth: []
       responses:
@@ -126,28 +299,618 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      data:
-                        type: array
-                        items:
-                          type: object
-                          properties:
-                            role:
-                              type: string
-                              example: owner
-                            workspace:
-                              $ref: '#/components/schemas/Workspace'
-                          type: object
-                          properties:
-                            role: 
-                              type: string
-                              example: members
-                            workspace:
-                              $ref: '#/components/schemas/Workspace'
-                              name: Frontend engineering team
+                $ref: '#/components/schemas/ApiResponseWorkspaceArray'
         401:
-          descriptiom: Unauthorized
-  
+          description: Unauthorized
+  /workspaces/{id}:
+    get:
+      tags:
+        - Workspaces
+      summary: Get workspace by ID
+      description: Fetch a workspace if the authenticated user is a member.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Workspace ID
+          schema:
+            type: string
+            example: "64a7f0c2e4b0c8b1a2d3e4f5"
+      responses:
+        200:
+          description: Workspace fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseWorkspaceWithRole'
+        400:
+          description: Invalid workspace ID
+        401:
+          description: Unauthorized
+        403:
+          description: User is not a member of this workspace
+        404:
+          description: Workspace not found
+    patch:
+      tags:
+        - Workspaces
+      summary: Update workspace
+      description: |
+        Update workspace details.
+        Only owners and admins can update a workspace.
+        Only owners can archive a workspace.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Workspace ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: Backend Team
+                description:
+                  type: string
+                  example: Updated description
+                isActive:
+                  type: boolean
+                  example: false
+      responses:
+        200:
+          description: Workspace updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseWorkspace'
+        400:
+          description: Invalid request
+        401:
+          description: Unauthorized
+        403:
+          description: Insufficient permissions
+        404:
+          description: Workspace not found
+    delete:
+      tags:
+        - Workspaces
+      summary: Archive Workspace
+      description: Archive a workspace by marking it inactive. Only owners can perform this action.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Workspace ID
+          schema:
+            type: string
+      responses:
+        200:
+          description: Workspace archived successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseWorkspace'
+        400:
+          description: Workspace already archived
+        401:
+          description: Unauthorized
+        403:
+          description: Only owners can archive workspaces
+        404:
+          description: Workspace not found
+  /workspaces/{id}/members:
+    post:
+      tags:
+        - Members
+      summary: Add member to workspace
+      description: Add a user to the workspace with a specific role.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Workspace ID
+          schema: 
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+              properties:
+                userId:
+                  type: string
+                  example: "64a7f0c2e4b0c8b1a2d3e4f5"
+                role:
+                  type: string
+                  enum: [owner, admin, member, viewer]
+                  example: member
+      responses:
+        201:
+          description: Member added to workspace successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseWorkspaceMember'
+        400:
+          description: Invalid request
+        401:
+          description: Unauthorized
+        403:
+          description: Insufficient workspace permissions
+        404:
+          description: Workspace or user not found
+        409:
+          description: User is already a member of the workspace
+    get:
+      tags:
+        - Members
+      summary: Get workspace Members
+      description: Fetch all members of a workspace
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Workspace ID
+          schema:
+            type: string
+      responses:
+        200:
+          description: Workspace members fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseWorkspaceMemberArray'
+        400:
+          description: Invalid workspace ID
+        401: 
+          description: Unauthorized
+        403:
+          description: User is not a member of this workspace
+        404:
+          description: Workspace not found
+  /workspaces/{id}/members/{userId}:
+    patch:
+      tags:
+        - Members
+      summary: Update workspace member role
+      description: |
+        Update the role of a workspace member.
+        Only owners and admins can perform this action.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Workspace ID
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          description: Target user ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - role
+              properties:
+                role:
+                  type: string
+                  enum: [owner, admin, member, viewer]
+                  example: admin
+      responses:
+        200:
+          description: Workspace member role updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseWorkspaceMember'
+        400:
+          description: Invalid request
+        401:
+          description: Unauthorized
+        403:
+          description: Insufficient workspace permissions
+        404:
+          description: Member not found
+    delete:
+      tags:
+        - Members
+      summary: Remove workspace member
+      description: |
+        Remove a user from the workspace.
+        Users may remove themselves.
+        Owners and admins may remove other members.
+      security: 
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Workspace ID
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          description: Target User ID
+          schema:
+            type: string
+      responses:
+        200:
+          description: Member removed from workspace successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        400:
+          description: Invalid request
+        401:
+          description: Unauthorized 
+        403: 
+          description: Insufficient workspace permissions
+        404:
+          description: Member not found
+  /tasks:
+    post:
+      tags:
+        - Tasks
+      summary: Create a task
+      description: |
+        Create a new task inside a workspace.
+        Viewers are not allowed to create tasks.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - workspaceId
+                - title
+              properties:
+                workspaceId:
+                  type: string
+                  example: 64f1abc123
+                title:
+                  type: string
+                  example: Implement authentication
+                description:
+                  type: string
+                  example: Add JWT-based auth middleware
+                priority:
+                  type: string
+                  enum: [low, medium, high]
+                  example: medium
+                assignedTo:
+                  type: string
+                  example: 64e9user123
+      responses:
+        201:
+          description: Task created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseTask'
+        400:
+          description: Invalid request
+        401:
+          description: Unauthorized
+        403:
+          description: Viewers cannot create tasks
+        404:
+          description: Workspace not found or inactive
+    get:
+      tags:
+        - Tasks
+      summary: Get tasks
+      description: Fetch tasks for a workspace with optional filters.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: query
+          required: true
+          description: Workspace ID
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [todo, in-progress, done]
+        - name: priority
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [low, medium, high]
+        - name: assignedTo
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        200:
+          description: Tasks fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseTaskArray'
+        400:
+          description: Invalid query parameters
+        401:
+          description: Unauthorized
+        403:
+          description: User is not a member of this workspace
+        404:
+          description: Workspace not found or inactive
+  /tasks/{id}:
+    patch:
+      tags:
+        - Tasks
+      summary: Update task
+      description: Update task details such as title, status, priority, or assignee.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Task ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                status:
+                  type: string
+                  enum: [todo, in-progress, done]
+                priority:
+                  type: string
+                  enum: [low, medium, high]
+                assignedTo:
+                  type: string
+                  nullable: true
+      responses:
+        200:
+          description: Task updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseTask'
+        400:
+          description: Invalid request
+        401:
+          description: Unauthorized
+        403:
+          description: Viewers cannot update tasks
+        404:
+          description: Task or workspace not found
+    delete:
+      tags:
+        - Tasks
+      summary: Delete task
+      description: Delete a task from a workspace.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Task ID
+          schema:
+            type: string
+      responses:
+        200:
+          description: Task deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        401:
+          description: Unauthorized
+        403:
+          description: Viewers cannot delete tasks
+        404:
+          description: Task or workspace not found
+  /tasks/{id}/comments:
+    post:
+      tags:
+        - Comments
+      summary: Add comment to task
+      description: Add a new comment to a task.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Task ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - content
+              properties:
+                content:
+                  type: string
+                  example: We should refactor this logic.
+      responses:
+        201:
+          description: Comment created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseComment'
+        400:
+          description: Invalid request
+        401:
+          description: Unauthorized
+        403:
+          description: User is not allowed to comment on this task
+        404:
+          description: Task or workspace not found
+    get:
+      tags:
+        - Comments
+      summary: Get task comments
+      description: Fetch all comments associated with a task.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Task ID
+          schema:
+            type: string
+      responses:
+        200:
+          description: Comments fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseCommentArray'
+        400:
+          description: Invalid task ID
+        401:
+          description: Unauthorized
+        403:
+          description: User is not a member of this workspace
+        404:
+          description: Task or workspace not found
+  /tasks/{id}/comments/{commentId}:
+    patch:
+      tags:
+        - Comments
+      summary: Update comment
+      description: Update the content of a comment. Only the comment author can edit.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Task ID
+          schema:
+            type: string
+        - name: commentId
+          in: path
+          required: true
+          description: Comment ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - content
+              properties:
+                content:
+                  type: string
+                  example: Updated comment content.
+      responses:
+        200:
+          description: Comment updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseComment'
+        400:
+          description: Invalid request
+        401:
+          description: Unauthorized
+        403:
+          description: You can only edit your own comments
+        404:
+          description: Comment or task not found
+    delete:
+      tags:
+        - Comments
+      summary: Delete comment
+      description: |
+        Delete a comment.
+        Comment authors may delete their own comments.
+        Workspace owners and admins may delete any comment.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Task ID
+          schema:
+            type: string
+        - name: commentId
+          in: path
+          required: true
+          description: Comment ID
+          schema:
+            type: string
+      responses:
+        200:
+          description: Comment deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        400:
+          description: Invalid request
+        401:
+          description: Unauthorized
+        403:
+          description: Insufficient permissions to delete comment
+        404:
+          description: Comment or task not found
+
+
+
+
+
+
+

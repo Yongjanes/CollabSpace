@@ -5,3 +5,4 @@
 
 
 
+“Swagger UI hides internal schemas for clarity”

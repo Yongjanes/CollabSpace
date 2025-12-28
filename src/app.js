@@ -20,7 +20,14 @@ app.use(cookieParser())
 
 const swaggerDocument = YAML.load('./src/docs/openapi.yaml')
 
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument))
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
+    customCss: `
+    #model-ApiResponse, #model-ApiResponseWorkspace, #model-ApiResponseWorkspaceArray, #model-ApiResponseWorkspaceWithRole, #model-ApiResponseWorkspaceMember, #model-ApiResponseWorkspaceMemberArray, #model-ApiResponseTask, #model-ApiResponseTaskArray, #model-ApiResponseComment, #model-ApiResponseCommentArray {
+        display: none;
+    }
+    `,
+    customSiteTitle: "CollabSpace API Docs"
+}))
 
 // import routers
 
