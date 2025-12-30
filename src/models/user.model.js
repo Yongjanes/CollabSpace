@@ -19,7 +19,23 @@ const userSchema = new mongoose.Schema(
         isActive: {
             type: Boolean,
             default: true
-        }
+        },
+        refreshTokens: [
+            {
+                tokenHash: {
+                    type: String,
+                    required: true
+                },
+                createdAt: {
+                    type: Date,
+                    default: Date.now
+                },
+                expiresAt: {
+                    type: Date,
+                    required: true
+                }
+            }
+        ]
     },
     {
         timestamps: true

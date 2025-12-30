@@ -33,9 +33,11 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
 
 import { workspaceRouter } from './routes/workspace.routes.js'
 import { taskRouter } from './routes/task.routes.js'
+import { authRouter } from './auth/auth.routes.js'
 
 // use routers
 
+app.use('/api/v1/auth', authRouter)
 app.use('/api/v1/workspaces', workspaceRouter)
 app.use('/api/v1/tasks', taskRouter)
 
