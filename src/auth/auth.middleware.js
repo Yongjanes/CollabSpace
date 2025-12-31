@@ -29,7 +29,7 @@ const requireAuth = asyncHandler( async (req, _, next) => {
     }
 
     // 3. Fetch user
-    req.user = await User.findById(decodedToken.id).select('-password')
+    req.user = await User.findById(decodedToken.sub).select('-password')
 
     if (!req.user) {
         throw new ApiError(401, 'User not found')
