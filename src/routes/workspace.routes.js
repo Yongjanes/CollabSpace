@@ -25,4 +25,10 @@ import { workspaceMemberRouter } from './workspaceMember.routes.js'
 
 workspaceRouter.use('/:id/members', workspaceMemberRouter)
 
+// activity Routes
+
+import { getWorkspaceActivity } from '../controllers/activity.controller.js'
+
+workspaceRouter.route('/:id/activity').get(getWorkspaceActivity)
+
 export { workspaceRouter }
