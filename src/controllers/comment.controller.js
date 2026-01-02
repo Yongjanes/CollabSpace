@@ -4,6 +4,7 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
 import { ApiResponse } from '../utils/ApiResponse.js'
 import { getPaginationParams, buildPaginationMeta } from '../utils/pagination.js'
+import { logActivity } from '../utils/activityLogger.js'
 
 import { Task } from '../models/task.model.js'
 import { Workspace } from '../models/workspace.model.js'
@@ -45,6 +46,19 @@ const createComment = asyncHandler( async (req, res) => {
             content: content.trim()
         }
     )
+
+    await logActivity({
+        type: 'COMMENT_CREATED',
+        actorId: req.user._id,
+        workspaceId: task.workspaceId,
+        entity: {
+            type: 'comment',
+            id: comment._id
+        },
+        metadata: {
+            taskId: taskId
+        }
+    })
 
     await comment.populate('authorId', 'name email')
 
@@ -167,6 +181,19 @@ const deleteComment = asyncHandler( async (req, res) => {
 
     await comment.deleteOne()
 
+    await logActivity({
+        type: 'COMMENT_DELETED',
+        actorId: req.user._id,
+        workspaceId: task.workspaceId,
+        entity: {
+            type: 'comment',
+            id: comment._id
+        },
+        metadata: {
+            taskId: task._id
+        }
+    })
+
     return res
         .status(200)
         .json(
@@ -234,6 +261,19 @@ const updateComment = asyncHandler( async (req, res) => {
     comment.content = content.trim()
 
     await comment.save()
+
+    await logActivity({
+        type: 'COMMENT_UPDATED',
+        actorId: req.user._id,
+        workspaceId: task.workspaceId,
+        entity: {
+            type: 'comment',
+            id: comment._id
+        }, 
+        metadata: {
+            taskId: task._id
+        }
+    })
 
     return res
         .status(200)

@@ -4,6 +4,7 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
 import { ApiResponse } from '../utils/ApiResponse.js'
 import { getPaginationParams, buildPaginationMeta } from '../utils/pagination.js'
+import { logActivity } from '../utils/activityLogger.js'
 
 import { requireWorkspaceMember, requireWorkspaceRole } from '../permissions/workspace.permissions.js'
 
@@ -64,6 +65,19 @@ const addWorkspaceMember = asyncHandler( async (req, res) => {
             role: assignedRole
         }
     )
+
+    await logActivity({
+        type: 'MEMBER_ADDED',
+        actorId: req.user._id,
+        workspaceId: workspaceId,
+        entity: {
+            type: 'member',
+            id: userId
+        },
+        metadata: {
+            role: assignedRole
+        }
+    })
 
     return res
         .status(201)
@@ -166,6 +180,10 @@ const updateWorkspaceMemberRole = asyncHandler( async (req, res) => {
         }
     )
 
+    if (!targetMembership) {
+        throw new ApiError(404, 'Target user is not a member of this workspace')
+    }
+
     if (targetMembership.role === role) {
         return res
             .status(200)
@@ -180,10 +198,6 @@ const updateWorkspaceMemberRole = asyncHandler( async (req, res) => {
                 )
             )
 
-    }
-
-    if (!targetMembership) {
-        throw new ApiError(404, 'Target user is not a member of this workspace')
     }
 
     if (requesterMembership.role === 'admin' && role === 'owner') {
@@ -204,7 +218,21 @@ const updateWorkspaceMemberRole = asyncHandler( async (req, res) => {
     }
 
     targetMembership.role = role
+
     await targetMembership.save()
+
+    await logActivity({
+        type: 'MEMBER_ROLE_UPDATED',
+        actorId: req.user._id,
+        workspaceId: workspaceId,
+        entity: {
+            type: 'member',
+            id: targetUserId
+        },
+        metadata: {
+            newRole: role
+        }
+    })
 
     return res
         .status(200)
@@ -273,6 +301,16 @@ const removeWorkspaceMember = asyncHandler( async (req, res) => {
     }
 
     await WorkspaceMember.deleteOne({ _id: targetMembership._id })
+
+    await logActivity({
+        type: 'MEMBER_REMOVED',
+        actorId: req.user._id,
+        workspaceId: workspaceId,
+        entity: {
+            type: 'member',
+            id: targetUserId
+        }
+    })
 
     return res
         .status(200)

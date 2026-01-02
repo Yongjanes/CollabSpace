@@ -4,6 +4,7 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
 import { ApiResponse } from '../utils/ApiResponse.js'
 import { getPaginationParams, buildPaginationMeta } from '../utils/pagination.js'
+import { logActivity } from '../utils/activityLogger.js'
 
 import { requireWorkspaceMember, requireWorkspaceRole } from '../permissions/workspace.permissions.js'
 
@@ -58,6 +59,19 @@ const createWorkspace = asyncHandler( async (req, res) => {
 
         await session.commitTransaction()
         session.endSession()
+
+        await logActivity({
+            type: 'WORKSPACE_CREATED',
+            actorId: req.user._id,
+            workspaceId: newWorkspace._id,
+            entity: {
+                type: 'workspace',
+                id: newWorkspace._id
+            },
+            metadata: {
+                name: newWorkspace.name
+            }
+        })
 
         return res
             .status(201)
@@ -195,6 +209,19 @@ const updateWorkspace = asyncHandler( async (req, res) => {
     }
 
     await workspace.save()
+
+    await logActivity({
+        type: 'WORKSPACE_UPDATED',
+        actorId: req.user._id,
+        workspaceId: workspace._id,
+        entity: {
+            type: 'workspace',
+            id: workspace._id
+        },
+        metadata: {
+            name: workspace.name
+        }
+    })
 
     return res
         .status(200)

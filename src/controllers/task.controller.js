@@ -4,6 +4,7 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
 import { ApiResponse } from '../utils/ApiResponse.js'
 import { getPaginationParams, buildPaginationMeta } from '../utils/pagination.js'
+import { logActivity } from '../utils/activityLogger.js'
 
 import { Workspace } from '../models/workspace.model.js'
 import { WorkspaceMember } from '../models/workspaceMember.model.js'
@@ -71,6 +72,20 @@ const createTask = asyncHandler( async (req, res) => {
             createdBy: req.user._id
         }
     )
+
+    await logActivity({
+        type: 'TASK_CREATED',
+        actorId: req.user._id,
+        workspaceId: workspaceId,
+        entity: {
+            type: 'task',
+            id: task._id
+        },
+        metadata: {
+            title: task.title,
+            priority: task.priority
+        }
+    })
 
     return res
         .status(201)
@@ -245,6 +260,19 @@ const updateTask = asyncHandler( async (req, res) => {
 
     await task.save()
 
+    await logActivity({
+        type: 'TASK_UPDATED',
+        actorId: req.user._id,
+        workspaceId: task.workspaceId,
+        entity: {
+            type: 'task',
+            id: task._id
+        },
+        metadata: {
+            title: task.title
+        }
+    })
+
     return res
         .status(200)
         .json(
@@ -289,6 +317,19 @@ const deleteTask = asyncHandler( async (req, res) => {
     }
 
     await task.deleteOne()
+
+    await logActivity({
+        type: 'TASK_DELETED',
+        actorId: req.user._id,
+        workspaceId: task.workspaceId,
+        entity: {
+            type: 'task',
+            id: task._id
+        },
+        metadata: {
+            title: task.title
+        }
+    })
 
     return res
         .status(200)
