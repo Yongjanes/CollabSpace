@@ -3,6 +3,7 @@ import mongoose from 'mongoose'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
 import { ApiResponse } from '../utils/ApiResponse.js'
+import { getPaginationParams, buildPaginationMeta } from '../utils/pagination.js'
 
 import { Task } from '../models/task.model.js'
 import { Workspace } from '../models/workspace.model.js'
@@ -79,14 +80,30 @@ const getTaskComments = asyncHandler( async (req, res) => {
 
     await requireWorkspaceMember(req.user._id, task.workspaceId)
 
-    const comments = await Comment.find(
-        {
-            taskId: taskId
-        }
+    // const comments = await Comment.find(
+    //     {
+    //         taskId: taskId
+    //     }
+    // )
+    //     .populate('authorId', 'name email')
+    //     .sort({ createdAt: 1 })
+    //     .lean()
+
+    const { page, limit, skip } = getPaginationParams(req.query)
+
+    const [ comments, totalItems ] = await Promise.all(
+        [
+            Comment.find({ taskId: taskId } )
+                .populate('authorId', 'name email')
+                .sort( { createdAt: 1 } )
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+            Comment.countDocuments({ taskId: taskId })
+        ]
     )
-        .populate('authorId', 'name email')
-        .sort({ createdAt: 1 })
-        .lean()
+
+    const meta = buildPaginationMeta({ page, limit, totalItems })
 
     return res
         .status(200)
@@ -94,7 +111,10 @@ const getTaskComments = asyncHandler( async (req, res) => {
             new ApiResponse(
                 200,
                 'Comments fetched successfully',
-                comments
+                {
+                    items: comments,
+                    meta: meta
+                }
             )
         )
 })

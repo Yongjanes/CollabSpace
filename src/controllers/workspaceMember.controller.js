@@ -1,8 +1,9 @@
 import mongoose from 'mongoose'
 
-import { asyncHandler } from '../utils/asyncHandler.js';
+import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
 import { ApiResponse } from '../utils/ApiResponse.js'
+import { getPaginationParams, buildPaginationMeta } from '../utils/pagination.js'
 
 import { requireWorkspaceMember, requireWorkspaceRole } from '../permissions/workspace.permissions.js'
 
@@ -90,14 +91,28 @@ const getWorkspaceMembers = asyncHandler( async (req, res) => {
 
     await requireWorkspaceMember(req.user._id, workspaceId)
 
-    const members = await WorkspaceMember.find(
-        {
-            workspaceId: workspaceId
-        }
+    // const members = await WorkspaceMember.find(
+    //     {
+    //         workspaceId: workspaceId
+    //     }
+    // )
+    // .populate('userId', 'name email')
+    // .sort({ createdAt: 1 })
+    // .lean()
+
+    const { page, limit, skip } = getPaginationParams(req.query)
+
+    const [ members, totalItems ] = await Promise.all(
+        [
+            WorkspaceMember.find({ workspaceId: workspaceId })
+                .populate('userId', 'name email')
+                .sort({ createdAt: 1 })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+            WorkspaceMember.countDocuments({ workspaceId: workspaceId })
+        ]
     )
-    .populate('userId', 'name email')
-    .sort({ createdAt: 1 })
-    .lean()
 
     const formattedMembers = members.map((member) => (
         {
@@ -107,13 +122,18 @@ const getWorkspaceMembers = asyncHandler( async (req, res) => {
         }
     ))
 
+    const meta = buildPaginationMeta({ page, limit, totalItems })
+
     return res
         .status(200)
         .json(
             new ApiResponse(
                 200,
                 "Workspace members fetched successfully",
-                formattedMembers
+                {
+                    items: formattedMembers,
+                    meta: meta
+                }
             )
         )
 })

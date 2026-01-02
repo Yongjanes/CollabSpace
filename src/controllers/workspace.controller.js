@@ -1,8 +1,9 @@
 import mongoose from 'mongoose'
 
-import { asyncHandler } from '../utils/asyncHandler.js';
+import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
 import { ApiResponse } from '../utils/ApiResponse.js'
+import { getPaginationParams, buildPaginationMeta } from '../utils/pagination.js'
 
 import { requireWorkspaceMember, requireWorkspaceRole } from '../permissions/workspace.permissions.js'
 
@@ -75,20 +76,37 @@ const createWorkspace = asyncHandler( async (req, res) => {
 })
 
 const getMyWorkspaces = asyncHandler( async (req, res) => {
-    const memberships = await WorkspaceMember.find(
-        {
-            userId: req.user._id
-        }
+    // const memberships = await WorkspaceMember.find(
+    //     {
+    //         userId: req.user._id
+    //     }
+    // )
+    // .populate('workspaceId', 'name description createdBy createdAt')
+    // .lean()
+
+    const { page, limit, skip } = getPaginationParams(req.query)
+
+    const [ memberships, totalItems ] = await Promise.all(
+        [
+            WorkspaceMember.find({ userId: req.user._id })
+                .populate('workspaceId', 'name description isActive createdAt')
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+            WorkspaceMember.countDocuments({ userId: req.user._id })
+        ]
     )
-    .populate('workspaceId', 'name description createdBy createdAt')
-    .lean()
 
     const workspaces = memberships.map((membership) => (
         {
             role: membership.role,
-            workspace: membership.workspaceId
+            workspace: membership.workspaceId,
+            joinedAt: membership.createdAt
         }
     ))
+
+    const meta = buildPaginationMeta({ page, limit, totalItems })
 
     return res
         .status(200)
@@ -96,7 +114,10 @@ const getMyWorkspaces = asyncHandler( async (req, res) => {
             new ApiResponse(
                 200,
                 "Workspaces fetched successfully",
-                workspaces
+                {
+                    items: workspaces,
+                    meta: meta
+                }
             )
         )
 })

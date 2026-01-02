@@ -3,6 +3,7 @@ import mongoose from 'mongoose'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
 import { ApiResponse } from '../utils/ApiResponse.js'
+import { getPaginationParams, buildPaginationMeta } from '../utils/pagination.js'
 
 import { Workspace } from '../models/workspace.model.js'
 import { WorkspaceMember } from '../models/workspaceMember.model.js'
@@ -126,11 +127,28 @@ const getTasks = asyncHandler( async (req, res) => {
         filter.assignedTo = assignedTo
     }
 
-    const tasks = await Task.find(filter)
-    .populate('assignedTo', 'name email')
-    .populate('createdBy', 'name email')
-    .sort({ createdAt: -1})
-    .lean()
+    const { page, limit, skip } = getPaginationParams(req.query)
+
+    // const tasks = await Task.find(filter)
+    // .populate('assignedTo', 'name email')
+    // .populate('createdBy', 'name email')
+    // .sort({ createdAt: -1})
+    // .lean()
+
+    const [ tasks, totalItems ] = await Promise.all(
+        [
+            Task.find(filter)
+                .populate('assignedTo', 'name email')
+                .populate('createdBy', 'name email')
+                .sort( { createdAt: -1 } )
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+                Task.countDocuments(filter)
+        ]
+    )
+
+    const meta = buildPaginationMeta( { page, limit, totalItems } )
 
     return res
         .status(200)
@@ -138,7 +156,10 @@ const getTasks = asyncHandler( async (req, res) => {
             new ApiResponse(
                 200,
                 'Tasks fetched successfully',
-                tasks
+                {
+                    items: tasks,
+                    meta: meta
+                }
             )
         )
 })
