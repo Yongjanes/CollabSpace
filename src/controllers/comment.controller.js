@@ -6,6 +6,8 @@ import { ApiResponse } from '../utils/ApiResponse.js'
 import { getPaginationParams, buildPaginationMeta } from '../utils/pagination.js'
 import { logActivity } from '../utils/activityLogger.js'
 
+import { redisClient } from '../config/redis.js'
+
 import { Task } from '../models/task.model.js'
 import { Workspace } from '../models/workspace.model.js'
 import { Comment } from '../models/comment.model.js'
@@ -62,6 +64,11 @@ const createComment = asyncHandler( async (req, res) => {
 
     await comment.populate('authorId', 'name email')
 
+    const keys = await redisClient.keys(`comments:task=${taskId}:*`)
+    if (keys.length > 0) {
+        await redisClient.del(keys)
+    }
+
     return res
         .status(201)
         .json(
@@ -105,6 +112,22 @@ const getTaskComments = asyncHandler( async (req, res) => {
 
     const { page, limit, skip } = getPaginationParams(req.query)
 
+    const cacheKey = `comments:task=${taskId}:page=${page}:limit=${limit}`
+
+    const cached = await redisClient.get(cacheKey)
+
+    if (cached) {
+        return res
+            .status(200)
+            .json(
+                new ApiResponse(
+                    200,
+                    'Comments fetched successfully (cache)',
+                    JSON.parse(cached)
+                )
+            )
+    }
+
     const [ comments, totalItems ] = await Promise.all(
         [
             Comment.find({ taskId: taskId } )
@@ -119,16 +142,24 @@ const getTaskComments = asyncHandler( async (req, res) => {
 
     const meta = buildPaginationMeta({ page, limit, totalItems })
 
+    const responseData = {
+        items: comments,
+        meta: meta
+    }
+
+    await redisClient.set(
+        cacheKey,
+        JSON.stringify(responseData),
+        { EX: 30 }
+    )
+
     return res
         .status(200)
         .json(
             new ApiResponse(
                 200,
                 'Comments fetched successfully',
-                {
-                    items: comments,
-                    meta: meta
-                }
+                responseData
             )
         )
 })
@@ -193,6 +224,11 @@ const deleteComment = asyncHandler( async (req, res) => {
             taskId: task._id
         }
     })
+
+    const keys = await redisClient.keys(`comments:task=${taskId}:*`)
+    if (keys.length > 0) {
+        await redisClient.del(keys)
+    }
 
     return res
         .status(200)
@@ -274,6 +310,11 @@ const updateComment = asyncHandler( async (req, res) => {
             taskId: task._id
         }
     })
+
+    const keys = await redisClient.keys(`comments:task=${taskId}:*`)
+    if (keys.length > 0) {
+        await redisClient.del(keys)
+    }
 
     return res
         .status(200)

@@ -6,6 +6,8 @@ import { ApiResponse } from '../utils/ApiResponse.js'
 import { getPaginationParams, buildPaginationMeta } from '../utils/pagination.js'
 import { logActivity } from '../utils/activityLogger.js'
 
+import { redisClient } from '../config/redis.js'
+
 import { requireWorkspaceMember, requireWorkspaceRole } from '../permissions/workspace.permissions.js'
 
 import { Workspace } from '../models/workspace.model.js'
@@ -79,6 +81,11 @@ const addWorkspaceMember = asyncHandler( async (req, res) => {
         }
     })
 
+    const keys = await redisClient.keys(`members:workspace=${workspaceId}:*`)
+    if (keys.length > 0) {
+        await redisClient.del(keys)
+    }
+
     return res
         .status(201)
         .json(
@@ -116,6 +123,22 @@ const getWorkspaceMembers = asyncHandler( async (req, res) => {
 
     const { page, limit, skip } = getPaginationParams(req.query)
 
+    const cacheKey = `members:workspace=${workspaceId}:page=${page}:limit=${limit}`
+
+    const cached = await redisClient.get(cacheKey)
+
+    if (cached) {
+        return res
+            .status(200)
+            .json(
+                new ApiResponse(
+                    200,
+                    'Workspace members fetched successfully (cache)',
+                    JSON.parse(cached)
+                )
+            )
+    }
+
     const [ members, totalItems ] = await Promise.all(
         [
             WorkspaceMember.find({ workspaceId: workspaceId })
@@ -138,16 +161,24 @@ const getWorkspaceMembers = asyncHandler( async (req, res) => {
 
     const meta = buildPaginationMeta({ page, limit, totalItems })
 
+    const responseData = {
+        items: formattedMembers,
+        meta: meta
+    }
+
+    await redisClient.set(
+        cacheKey,
+        JSON.stringify(responseData),
+        { EX: 30 }
+    )
+
     return res
         .status(200)
         .json(
             new ApiResponse(
                 200,
                 "Workspace members fetched successfully",
-                {
-                    items: formattedMembers,
-                    meta: meta
-                }
+                responseData
             )
         )
 })
@@ -234,6 +265,11 @@ const updateWorkspaceMemberRole = asyncHandler( async (req, res) => {
         }
     })
 
+    const keys = await redisClient.keys(`members:workspace=${workspaceId}:*`)
+    if (keys.length > 0) {
+        await redisClient.del(keys)
+    }
+
     return res
         .status(200)
         .json(
@@ -311,6 +347,11 @@ const removeWorkspaceMember = asyncHandler( async (req, res) => {
             id: targetUserId
         }
     })
+
+    const keys = await redisClient.keys(`members:workspace=${workspaceId}:*`)
+    if (keys.length > 0) {
+        await redisClient.del(keys)
+    }
 
     return res
         .status(200)

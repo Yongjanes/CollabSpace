@@ -6,6 +6,8 @@ import { ApiResponse } from '../utils/ApiResponse.js'
 import { getPaginationParams, buildPaginationMeta } from '../utils/pagination.js'
 import { logActivity } from '../utils/activityLogger.js'
 
+import { redisClient } from '../config/redis.js'
+
 import { Workspace } from '../models/workspace.model.js'
 import { WorkspaceMember } from '../models/workspaceMember.model.js'
 import { Task } from '../models/task.model.js'
@@ -87,6 +89,12 @@ const createTask = asyncHandler( async (req, res) => {
         }
     })
 
+    const keys = await redisClient.keys(`tasks:workspace=${workspaceId}:*`);
+    if (keys.length > 0) {
+        await redisClient.del(keys);
+    }
+
+
     return res
         .status(201)
         .json(
@@ -144,6 +152,25 @@ const getTasks = asyncHandler( async (req, res) => {
 
     const { page, limit, skip } = getPaginationParams(req.query)
 
+    const cacheKey = `tasks:workspace=${workspaceId}:page=${page}:limit=${limit}` +
+        `:status=${status || 'all'}` +
+        `:priority=${priority || 'all'}` + 
+        `:assignedTo=${assignedTo || 'all'}`
+
+    const cached = await redisClient.get(cacheKey)
+
+    if (cached) {
+        return res
+            .status(200)
+            .json(
+                new ApiResponse(
+                    200,
+                    'Tasks fetched successfully (cache)',
+                    JSON.parse(cached)
+                )
+            )
+    }
+
     // const tasks = await Task.find(filter)
     // .populate('assignedTo', 'name email')
     // .populate('createdBy', 'name email')
@@ -165,16 +192,24 @@ const getTasks = asyncHandler( async (req, res) => {
 
     const meta = buildPaginationMeta( { page, limit, totalItems } )
 
+    const responseData = {
+        items: tasks,
+        meta: meta
+    }
+
+    await redisClient.set(
+        cacheKey,
+        JSON.stringify(responseData),
+        { EX: 30 }
+    )
+
     return res
         .status(200)
         .json(
             new ApiResponse(
                 200,
                 'Tasks fetched successfully',
-                {
-                    items: tasks,
-                    meta: meta
-                }
+                responseData
             )
         )
 })
@@ -273,6 +308,11 @@ const updateTask = asyncHandler( async (req, res) => {
         }
     })
 
+    const keys = await redisClient.keys(`tasks:workspace=${task.workspaceId}:*`);
+    if (keys.length > 0) {
+        await redisClient.del(keys);
+    }
+
     return res
         .status(200)
         .json(
@@ -330,6 +370,11 @@ const deleteTask = asyncHandler( async (req, res) => {
             title: task.title
         }
     })
+
+    const keys = await redisClient.keys(`tasks:workspace=${task.workspaceId}:*`);
+    if (keys.length > 0) {
+        await redisClient.del(keys);
+    }
 
     return res
         .status(200)
