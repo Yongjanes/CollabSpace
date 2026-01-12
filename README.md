@@ -97,7 +97,7 @@ The easiest way to run CollabSpace locally is using Docker Compose, which automa
 
 #### 1. Clone the Repository
 ```bash
-git clone <repository-url>
+git clone git@github.com:Yongjanes/CollabSpace.git
 cd CollabSpace
 ```
 
