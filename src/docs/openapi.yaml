@@ -293,6 +293,19 @@ paths:
       description: Fetch all workspaces the authenticated user is a member of
       security:
         - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
       responses:
         200:
           description: Workspaces fetched successfully
@@ -410,6 +423,63 @@ paths:
           description: Only owners can archive workspaces
         404:
           description: Workspace not found
+  /workspaces/{id}/activity:
+    get:
+      tags:
+        - Workspaces
+      summary: Get workspace activity log
+      description: Fetch activity log for a workspace with pagination
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Workspace ID
+          schema: 
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema: 
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema: 
+            type: integer
+            default: 10
+      responses:
+        200:
+          description: Workspace activity fetched successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data: 
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            actorId:
+                              $ref: '#/components/schemas/User'
+                            action:
+                              type: string
+                            createdAt: 
+                              type: string
+                              format: date-time
+        400:
+          description: Invalid workspace ID
+        401:
+          description: Unauthorized
+        403:
+          description: User is not a member of this workspace
+        404: 
+          description: Workspace not found
   /workspaces/{id}/members:
     post:
       tags:
@@ -472,6 +542,18 @@ paths:
           description: Workspace ID
           schema:
             type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
       responses:
         200:
           description: Workspace members fetched successfully
@@ -658,6 +740,18 @@ paths:
           required: false
           schema:
             type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
       responses:
         200:
           description: Tasks fetched successfully
@@ -806,6 +900,18 @@ paths:
           description: Task ID
           schema:
             type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
       responses:
         200:
           description: Comments fetched successfully
@@ -907,6 +1013,163 @@ paths:
           description: Insufficient permissions to delete comment
         404:
           description: Comment or task not found
+  /auth/register:
+    post:
+      tags:
+        - Auth
+      summary: Register a new user
+      description: Create a new user account with email and password
+      requestBody:
+        required: true
+        content: 
+          application/json:
+            schema: 
+              type: object
+              required:
+                - name
+                - email
+                - password
+              properties:
+                name: 
+                  type: string
+                  example: John Doe
+                email:
+                  type: string
+                  example: john@example.com
+                password:
+                  type: string
+                  format: password
+                  example: securePassword123
+      responses:
+        201:
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          name:
+                            type: string
+        400:
+          description: Missing required fields
+        409:
+          description: User already exists
+  /auth/login:
+    post: 
+      tags:
+        - Auth
+      summary: Login user
+      description: Authenticate user and get access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: 
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: john@example.com
+                password:
+                  type: string
+                  format: password
+                  example: securePassword123
+      responses:
+        200:
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          accessToken:
+                            type: string
+                            description: JWT access token
+        400:
+          description: Missing email and password
+        401:
+          description: Invalid credentials
+        403: 
+          description: User account is inactive
+  /auth/refresh:
+    post:
+      tags:
+        - Auth
+      summary: Refresh access token
+      description: Get a new access token using refresh token from cookies.
+      responses:
+        200:
+          description: Access token refreshed successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          accessToken:
+                            type: string
+                            description: New JWT access token
+        401:
+          description: Refresh token missing or Invalid
+  /auth/logout:
+    post:
+      tags:
+        - Auth
+      summary: Logout user
+      description: Logout the user and invalidate refresh token.
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse' 
+        401:
+          description: Unauthorized
+  /auth/me:
+    get:
+      tags:
+        - Auth
+      summary: Get current user profile
+      description: Fetch the authenticated user's profile information.
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: User profile fetched successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        401:
+          description: Unauthorized
 
 
 
