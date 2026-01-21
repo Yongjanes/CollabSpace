@@ -125,7 +125,7 @@ Create a `.env` file in the root directory with the following variables:
 
 ```env
 # Server Configuration
-PORT=3000
+PORT=8000
 NODE_ENV=production
 
 # Database
