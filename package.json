@@ -1,7 +1,7 @@
 {
     "name": "collabspace",
     "version": "1.0.0",
-    "description": "A production-ready backend for real-time team collaboration, supporting multi-workspace management, role-based access control, task tracking, and live updates using WebSockets. Designed with scalability, security, and performance in mind. \n\nhttps://collabspace-k444.onrender.com/api-docs/#/",
+    "description": "A production-ready backend for real-time team collaboration, supporting multi-workspace management, role-based access control, task tracking, and live updates using WebSockets. Designed with scalability, security, and performance in mind. \n\n https://collabspace-k444.onrender.com/api-docs/#/",
     "license": "ISC",
     "author": "Rohit Pali",
     "type": "module",
