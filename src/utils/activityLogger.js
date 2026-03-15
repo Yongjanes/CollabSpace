@@ -1,9 +1,10 @@
 import { ActivityLog } from '../models/activityLog.model.js'
-import { redisClient } from '../config/redis.js'
+import { ApiError } from './ApiError.js'
+import { scanAndDelete } from './cache.js'
 
 const logActivity = async ({ type, actorId, workspaceId, entity, metadata = {}}) => {
     if (!type || !actorId || !workspaceId || !entity?.type || !entity?.id) {
-        throw new Error('Invalid activity log payload')
+        throw new ApiError(500, 'Invalid activity log payload')
     }
 
     await ActivityLog.create(
@@ -16,10 +17,7 @@ const logActivity = async ({ type, actorId, workspaceId, entity, metadata = {}})
         }
     )
 
-    const keys = await redisClient.keys(`activity:${workspaceId}:*`)
-    if (keys.length > 0) {
-        await redisClient.del(keys)
-    }
+    await scanAndDelete(`activity:${workspaceId}:*`)
 }
 
 export { logActivity }

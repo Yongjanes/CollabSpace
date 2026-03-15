@@ -6,6 +6,11 @@ services:
     container_name: collabspace-backend
     ports:
       - "8000:8000"
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017/CollabSpaceDB
+      - REDIS_URL=redis://localhost:6379
+      - NODE_ENV=development
+      - PORT=8000
     env_file:
       - .env
     depends_on:
@@ -19,10 +24,16 @@ services:
   mongo:
     image: mongo:6
     container_name: collabspace-mongo
+    command: ["--replSet", "rs0", "--bind_ip_all"]
     ports:
       - "27017:27017"
     volumes:
       - mongo-data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 5s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
   redis:

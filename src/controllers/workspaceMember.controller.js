@@ -7,6 +7,7 @@ import { getPaginationParams, buildPaginationMeta } from '../utils/pagination.js
 import { logActivity } from '../utils/activityLogger.js'
 
 import { redisClient } from '../config/redis.js'
+import { scanAndDelete } from '../utils/cache.js'
 
 import { requireWorkspaceMember, requireWorkspaceRole } from '../permissions/workspace.permissions.js'
 
@@ -14,15 +15,29 @@ import { Workspace } from '../models/workspace.model.js'
 import { WorkspaceMember } from '../models/workspaceMember.model.js'
 import { User } from "../models/user.model.js"
 
-const addWorkspaceMember = asyncHandler( async (req, res) => {
+const addWorkspaceMember = asyncHandler(async (req, res) => {
     const { id: workspaceId } = req.params
-    const { userId, role } = req.body
+    const { userId, email, role } = req.body
 
     if (!mongoose.Types.ObjectId.isValid(workspaceId)) {
         throw new ApiError(400, "Invalid workspace id")
     }
 
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
+    let targetUserId = userId
+
+    if (!targetUserId && email) {
+        const userByEmail = await User.findOne({ email: email.toLowerCase() })
+        if (!userByEmail) {
+            throw new ApiError(404, 'User with this email not found')
+        }
+        targetUserId = userByEmail._id
+    }
+
+    if (!targetUserId) {
+        throw new ApiError(400, "Either userId or email is required")
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(targetUserId)) {
         throw new ApiError(400, "Invalid user id")
     }
 
@@ -35,8 +50,8 @@ const addWorkspaceMember = asyncHandler( async (req, res) => {
     const requestorMembership = await requireWorkspaceMember(req.user._id, workspaceId)
 
     requireWorkspaceRole(requestorMembership, ['owner', 'admin'])
-    
-    const user = await User.findById(userId)
+
+    const user = await User.findById(targetUserId)
 
     if (!user) {
         throw new ApiError(404, 'User not found')
@@ -44,7 +59,7 @@ const addWorkspaceMember = asyncHandler( async (req, res) => {
 
     const existingMember = await WorkspaceMember.findOne(
         {
-            userId: userId,
+            userId: targetUserId,
             workspaceId: workspaceId
         }
     )
@@ -60,9 +75,13 @@ const addWorkspaceMember = asyncHandler( async (req, res) => {
         throw new ApiError(400, 'Invalid role')
     }
 
+    if (requestorMembership.role === 'admin' && assignedRole === 'owner') {
+        throw new ApiError(403, 'Admins cannot assign owner role')
+    }
+
     const newMember = await WorkspaceMember.create(
         {
-            userId: userId,
+            userId: targetUserId,
             workspaceId: workspaceId,
             role: assignedRole
         }
@@ -74,17 +93,14 @@ const addWorkspaceMember = asyncHandler( async (req, res) => {
         workspaceId: workspaceId,
         entity: {
             type: 'member',
-            id: userId
+            id: targetUserId
         },
         metadata: {
             role: assignedRole
         }
     })
 
-    const keys = await redisClient.keys(`members:workspace=${workspaceId}:*`)
-    if (keys.length > 0) {
-        await redisClient.del(keys)
-    }
+    await scanAndDelete(`members:workspace=${workspaceId}:*`)
 
     return res
         .status(201)
@@ -97,7 +113,7 @@ const addWorkspaceMember = asyncHandler( async (req, res) => {
         )
 })
 
-const getWorkspaceMembers = asyncHandler( async (req, res) => {
+const getWorkspaceMembers = asyncHandler(async (req, res) => {
     const { id: workspaceId } = req.params
 
     if (!mongoose.Types.ObjectId.isValid(workspaceId)) {
@@ -139,7 +155,7 @@ const getWorkspaceMembers = asyncHandler( async (req, res) => {
             )
     }
 
-    const [ members, totalItems ] = await Promise.all(
+    const [members, totalItems] = await Promise.all(
         [
             WorkspaceMember.find({ workspaceId: workspaceId })
                 .populate('userId', 'name email')
@@ -183,7 +199,7 @@ const getWorkspaceMembers = asyncHandler( async (req, res) => {
         )
 })
 
-const updateWorkspaceMemberRole = asyncHandler( async (req, res) => {
+const updateWorkspaceMemberRole = asyncHandler(async (req, res) => {
     const { id: workspaceId, userId: targetUserId } = req.params
     const { role } = req.body
 
@@ -265,10 +281,7 @@ const updateWorkspaceMemberRole = asyncHandler( async (req, res) => {
         }
     })
 
-    const keys = await redisClient.keys(`members:workspace=${workspaceId}:*`)
-    if (keys.length > 0) {
-        await redisClient.del(keys)
-    }
+    await scanAndDelete(`members:workspace=${workspaceId}:*`)
 
     return res
         .status(200)
@@ -285,7 +298,7 @@ const updateWorkspaceMemberRole = asyncHandler( async (req, res) => {
 
 })
 
-const removeWorkspaceMember = asyncHandler( async (req, res) => {
+const removeWorkspaceMember = asyncHandler(async (req, res) => {
     const { id: workspaceId, userId: targetUserId } = req.params
 
     if (!mongoose.Types.ObjectId.isValid(workspaceId)) {
@@ -315,7 +328,7 @@ const removeWorkspaceMember = asyncHandler( async (req, res) => {
         requireWorkspaceRole(requesterMembership, ['owner', 'admin'])
     }
 
-    if (requesterMembership.role === 'admin' && targetMembership.role ==='owner') {
+    if (requesterMembership.role === 'admin' && targetMembership.role === 'owner') {
         throw new ApiError(403, 'Admins cannot remove owners')
     }
 
@@ -348,10 +361,7 @@ const removeWorkspaceMember = asyncHandler( async (req, res) => {
         }
     })
 
-    const keys = await redisClient.keys(`members:workspace=${workspaceId}:*`)
-    if (keys.length > 0) {
-        await redisClient.del(keys)
-    }
+    await scanAndDelete(`members:workspace=${workspaceId}:*`)
 
     return res
         .status(200)

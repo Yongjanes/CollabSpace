@@ -7,6 +7,7 @@ import { getPaginationParams, buildPaginationMeta } from '../utils/pagination.js
 import { logActivity } from '../utils/activityLogger.js'
 
 import { redisClient } from '../config/redis.js'
+import { scanAndDelete } from '../utils/cache.js'
 
 import { Workspace } from '../models/workspace.model.js'
 import { WorkspaceMember } from '../models/workspaceMember.model.js'
@@ -14,7 +15,7 @@ import { Task } from '../models/task.model.js'
 
 import { requireWorkspaceMember } from '../permissions/workspace.permissions.js'
 
-const createTask = asyncHandler( async (req, res) => {
+const createTask = asyncHandler(async (req, res) => {
     const { workspaceId, title, description, priority, assignedTo } = req.body
 
     if (!workspaceId || !title?.trim()) {
@@ -27,8 +28,8 @@ const createTask = asyncHandler( async (req, res) => {
 
     const workspace = await Workspace.findById(workspaceId)
 
-    if (!workspace || !workspace.isActive) {
-        throw new ApiError(404, 'Workspace not found or inactive')
+    if (!workspace) {
+        throw new ApiError(404, 'Workspace not found')
     }
 
     const requesterMembership = await requireWorkspaceMember(req.user._id, workspaceId)
@@ -49,7 +50,7 @@ const createTask = asyncHandler( async (req, res) => {
                     workspaceId: workspaceId
                 }
             )
-            
+
             if (!assigneeMembership) {
                 throw new ApiError(400, 'Assigned user must be a workspace member')
             }
@@ -75,6 +76,11 @@ const createTask = asyncHandler( async (req, res) => {
         }
     )
 
+    await task.populate([
+        { path: 'assignedTo', select: 'name email' },
+        { path: 'createdBy', select: 'name email' }
+    ])
+
     await logActivity({
         type: 'TASK_CREATED',
         actorId: req.user._id,
@@ -89,10 +95,7 @@ const createTask = asyncHandler( async (req, res) => {
         }
     })
 
-    const keys = await redisClient.keys(`tasks:workspace=${workspaceId}:*`);
-    if (keys.length > 0) {
-        await redisClient.del(keys);
-    }
+    await scanAndDelete(`tasks:workspace=${workspaceId}:*`)
 
 
     return res
@@ -106,21 +109,21 @@ const createTask = asyncHandler( async (req, res) => {
         )
 })
 
-const getTasks = asyncHandler( async (req, res) => {
+const getTasks = asyncHandler(async (req, res) => {
     const { workspaceId, status, assignedTo, priority } = req.query
 
     if (!workspaceId) {
         throw new ApiError(400, 'workspaceId is required')
     }
 
-    if (!mongoose.Types.ObjectId.isValid(workspaceId)){
+    if (!mongoose.Types.ObjectId.isValid(workspaceId)) {
         throw new ApiError(400, 'Invalid workspace id')
     }
 
-    const workspace = await Workspace.findById(workspaceId) 
+    const workspace = await Workspace.findById(workspaceId)
 
-    if (!workspace || !workspace.isActive) {
-        throw new ApiError(404, 'Workspace not found or inactive')
+    if (!workspace) {
+        throw new ApiError(404, 'Workspace not found')
     }
 
     await requireWorkspaceMember(req.user._id, workspaceId)
@@ -154,7 +157,7 @@ const getTasks = asyncHandler( async (req, res) => {
 
     const cacheKey = `tasks:workspace=${workspaceId}:page=${page}:limit=${limit}` +
         `:status=${status || 'all'}` +
-        `:priority=${priority || 'all'}` + 
+        `:priority=${priority || 'all'}` +
         `:assignedTo=${assignedTo || 'all'}`
 
     const cached = await redisClient.get(cacheKey)
@@ -177,20 +180,20 @@ const getTasks = asyncHandler( async (req, res) => {
     // .sort({ createdAt: -1})
     // .lean()
 
-    const [ tasks, totalItems ] = await Promise.all(
+    const [tasks, totalItems] = await Promise.all(
         [
             Task.find(filter)
                 .populate('assignedTo', 'name email')
                 .populate('createdBy', 'name email')
-                .sort( { createdAt: -1 } )
+                .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit)
                 .lean(),
-                Task.countDocuments(filter)
+            Task.countDocuments(filter)
         ]
     )
 
-    const meta = buildPaginationMeta( { page, limit, totalItems } )
+    const meta = buildPaginationMeta({ page, limit, totalItems })
 
     const responseData = {
         items: tasks,
@@ -214,10 +217,10 @@ const getTasks = asyncHandler( async (req, res) => {
         )
 })
 
-const updateTask = asyncHandler( async (req, res) => {
+const updateTask = asyncHandler(async (req, res) => {
     const { id: taskId } = req.params
     const { title, description, status, priority, assignedTo } = req.body
-    
+
     if (!mongoose.Types.ObjectId.isValid(taskId)) {
         throw new ApiError(400, 'Invalid task id')
     }
@@ -234,8 +237,8 @@ const updateTask = asyncHandler( async (req, res) => {
 
     const workspace = await Workspace.findById(task.workspaceId)
 
-    if (!workspace || !workspace.isActive) {
-        throw new ApiError(404, 'Workspace not found or inactive')
+    if (!workspace) {
+        throw new ApiError(404, 'Workspace not found')
     }
 
     const requesterMembership = await requireWorkspaceMember(req.user._id, task.workspaceId)
@@ -295,6 +298,11 @@ const updateTask = asyncHandler( async (req, res) => {
 
     await task.save()
 
+    await task.populate([
+        { path: 'assignedTo', select: 'name email' },
+        { path: 'createdBy', select: 'name email' }
+    ])
+
     await logActivity({
         type: 'TASK_UPDATED',
         actorId: req.user._id,
@@ -308,10 +316,7 @@ const updateTask = asyncHandler( async (req, res) => {
         }
     })
 
-    const keys = await redisClient.keys(`tasks:workspace=${task.workspaceId}:*`);
-    if (keys.length > 0) {
-        await redisClient.del(keys);
-    }
+    await scanAndDelete(`tasks:workspace=${task.workspaceId}:*`)
 
     return res
         .status(200)
@@ -325,8 +330,8 @@ const updateTask = asyncHandler( async (req, res) => {
 
 })
 
-const deleteTask = asyncHandler( async (req, res) => {
-    const { id: taskId } =  req.params
+const deleteTask = asyncHandler(async (req, res) => {
+    const { id: taskId } = req.params
 
     if (!mongoose.Types.ObjectId.isValid(taskId)) {
         throw new ApiError(400, 'Invalid task id')
@@ -340,8 +345,8 @@ const deleteTask = asyncHandler( async (req, res) => {
 
     const workspace = await Workspace.findById(task.workspaceId)
 
-    if (!workspace || !workspace.isActive) {
-        throw new ApiError(404, 'Workspace not found or inactive')
+    if (!workspace) {
+        throw new ApiError(404, 'Workspace not found')
     }
 
     const requesterMembership = await requireWorkspaceMember(req.user._id, task.workspaceId)
@@ -371,10 +376,7 @@ const deleteTask = asyncHandler( async (req, res) => {
         }
     })
 
-    const keys = await redisClient.keys(`tasks:workspace=${task.workspaceId}:*`);
-    if (keys.length > 0) {
-        await redisClient.del(keys);
-    }
+    await scanAndDelete(`tasks:workspace=${task.workspaceId}:*`)
 
     return res
         .status(200)
@@ -389,4 +391,33 @@ const deleteTask = asyncHandler( async (req, res) => {
         )
 })
 
-export { createTask, getTasks, updateTask, deleteTask }
+const getTaskById = asyncHandler(async (req, res) => {
+    const { id: taskId } = req.params
+
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+        throw new ApiError(400, 'Invalid task id')
+    }
+
+    const task = await Task.findById(taskId)
+        .populate('assignedTo', 'name email')
+        .populate('createdBy', 'name email')
+        .lean()
+
+    if (!task) {
+        throw new ApiError(404, 'Task not found')
+    }
+
+    await requireWorkspaceMember(req.user._id, task.workspaceId)
+
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(
+                200,
+                'Task details fetched successfully',
+                task
+            )
+        )
+})
+
+export { createTask, getTasks, getTaskById, updateTask, deleteTask }

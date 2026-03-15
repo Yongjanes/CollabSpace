@@ -2,7 +2,7 @@ import { Router } from 'express'
 
 import { requireAuth } from '../auth/auth.middleware.js'
 
-import { createTask, getTasks, updateTask, deleteTask } from '../controllers/task.controller.js'
+import { createTask, getTasks, getTaskById, updateTask, deleteTask } from '../controllers/task.controller.js'
 
 const taskRouter = Router()
 
@@ -15,6 +15,7 @@ taskRouter.use(requireAuth)
 
 taskRouter.route('/').post(createTask)
 taskRouter.route('/').get(getTasks)
+taskRouter.route('/:id').get(getTaskById)
 taskRouter.route('/:id').patch(updateTask)
 taskRouter.route('/:id').delete(deleteTask)
 

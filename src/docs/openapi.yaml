@@ -25,6 +25,8 @@ tags:
     description: Task management
   - name: Comments
     description: Task comments
+  - name: Users
+    description: User profile & dashboard data
 
 components:
   securitySchemes:
@@ -64,9 +66,6 @@ components:
           type: string
           description: MongoDB ObjectId of the creator
           example: "64a7f0c2e4b0c8b1a2d3e4f5"
-        isActive:
-          type: boolean
-          example: true
         createdAt:
           type: string
           format: date-time
@@ -248,6 +247,40 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/Comment'
+    ApiResponseDashboard:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                user:
+                  type: object
+                  properties:
+                    id: {type: string}
+                    name: {type: string}
+                    email: {type: string}
+                workspaces:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      role: {type: string}
+                      workspace: {$ref: '#/components/schemas/Workspace'}
+                      joinedAt: {type: string, format: date-time}
+                recentTasks:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id: {type: string}
+                      title: {type: string}
+                      status: {type: string}
+                      priority: {type: string}
+                      workspaceName: {type: string}
+                      workspaceId: {type: string}
+                      createdAt: {type: string, format: date-time}
 
 security:
   - bearerAuth: []
@@ -379,9 +412,6 @@ paths:
                 description:
                   type: string
                   example: Updated description
-                isActive:
-                  type: boolean
-                  example: false
       responses:
         200:
           description: Workspace updated successfully
@@ -400,8 +430,8 @@ paths:
     delete:
       tags:
         - Workspaces
-      summary: Archive Workspace
-      description: Archive a workspace by marking it inactive. Only owners can perform this action.
+      summary: Delete Workspace Permanently
+      description: Permanently delete a workspace and all its associated data (members, tasks, comments, activity logs). Only owners can perform this action.
       security:
         - bearerAuth: []
       parameters:
@@ -413,17 +443,15 @@ paths:
             type: string
       responses:
         200:
-          description: Workspace archived successfully
+          description: Workspace and all associated records deleted permanently
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseWorkspace'
-        400:
-          description: Workspace already archived
+                $ref: '#/components/schemas/ApiResponse'
         401:
           description: Unauthorized
         403:
-          description: Only owners can archive workspaces
+          description: Only owners can delete workspaces
         404:
           description: Workspace not found
   /workspaces/{id}/activity:
@@ -509,7 +537,13 @@ paths:
               properties:
                 userId:
                   type: string
+                  description: MongoDB ObjectId of the user (Either userId or email is required)
                   example: "64a7f0c2e4b0c8b1a2d3e4f5"
+                email:
+                  type: string
+                  format: email
+                  description: Email of the user to add (Alternative to userId)
+                  example: "user@example.com"
                 role:
                   type: string
                   enum: [owner, admin, member, viewer]
@@ -522,11 +556,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponseWorkspaceMember'
         400:
-          description: Invalid request
+          description: Invalid request or invalid role
         401:
           description: Unauthorized
         403:
-          description: Insufficient workspace permissions
+          description: |
+            Insufficient workspace permissions.
+            Admins cannot assign the `owner` role — only owners can grant ownership.
         404:
           description: Workspace or user not found
         409:
@@ -771,6 +807,35 @@ paths:
         404:
           description: Workspace not found or inactive
   /tasks/{id}:
+    get:
+      tags:
+        - Tasks
+      summary: Get task details
+      description: Fetch details of a single task by its ID.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Task ID
+          schema:
+            type: string
+      responses:
+        200:
+          description: Task details fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseTask'
+        400:
+          description: Invalid task ID
+        401:
+          description: Unauthorized
+        403:
+          description: User is not a member of the workspace
+        404:
+          description: Task not found
     patch:
       tags:
         - Tasks
@@ -1069,7 +1134,10 @@ paths:
       tags:
         - Auth
       summary: Login user
-      description: Authenticate user and get access token
+      description: |
+        Authenticate user and return both access and refresh tokens.
+        The refresh token is also set as an `httpOnly` cookie for web clients.
+        Mobile clients should store the `refreshToken` from the response body securely (e.g. Keychain / SecureStore).
       requestBody:
         required: true
         content:
@@ -1103,7 +1171,12 @@ paths:
                         properties:
                           accessToken:
                             type: string
-                            description: JWT access token
+                            description: Short-lived JWT access token
+                            example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                          refreshToken:
+                            type: string
+                            description: Long-lived refresh token (also set as httpOnly cookie for web)
+                            example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
         400:
           description: Missing email and password
         401:
@@ -1115,10 +1188,26 @@ paths:
       tags:
         - Auth
       summary: Refresh access token
-      description: Get a new access token using refresh token from cookies.
+      description: |
+        Issue a new access token and rotate the refresh token.
+        The refresh token can be provided via:
+        - `httpOnly` cookie (`refresh_token`) — web clients
+        - Request body (`refreshToken`) — mobile clients
+        The old refresh token is invalidated on use. If a reused token is detected, all sessions are wiped.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+                  description: Refresh token (for mobile clients — web clients use the cookie)
+                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
       responses:
         200:
-          description: Access token refreshed successfully
+          description: Token refreshed successfully
           content:
             application/json:
               schema:
@@ -1132,25 +1221,42 @@ paths:
                           accessToken:
                             type: string
                             description: New JWT access token
+                            example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                          refreshToken:
+                            type: string
+                            description: New refresh token (rotated — store and use this going forward)
+                            example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
         401:
-          description: Refresh token missing or Invalid
+          description: Refresh token missing, invalid, expired, or reuse detected
   /auth/logout:
     post:
       tags:
         - Auth
       summary: Logout user
-      description: Logout the user and invalidate refresh token.
-      security:
-        - bearerAuth: []
+      description: |
+        Invalidate the current refresh token and clear the cookie.
+        The refresh token can be provided via:
+        - `httpOnly` cookie (`refresh_token`) — web clients
+        - Request body (`refreshToken`) — mobile clients
+        If no refresh token is provided, the request still succeeds (idempotent).
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+                  description: Refresh token to invalidate (for mobile clients)
+                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
       responses:
         200:
-          description: Logout successful
+          description: Logged out successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponse' 
-        401:
-          description: Unauthorized
+                $ref: '#/components/schemas/ApiResponse'
   /auth/me:
     get:
       tags:
@@ -1171,6 +1277,108 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/User'
+        401:
+          description: Unauthorized
+  /users/dashboard:
+    get:
+      tags:
+        - Users
+      summary: Get user dashboard data
+      description: |
+        Fetch aggregated data for the user dashboard.
+        Includes user profile, workspaces, and recent assigned tasks.
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Dashboard data fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseDashboard'
+        401:
+          description: Unauthorized
+  /users/tasks:
+    get:
+      tags:
+        - Users
+      summary: Get user-relevant tasks
+      description: |
+        Fetch all tasks in workspaces the user is a member of.
+        Default filters to 'todo' and 'in-progress' statuses for an overview.
+        Supports filtering by status and priority (comma-separated).
+        Use `assignedToMe=true` to narrow down to personal tasks.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Comma-separated list of statuses (e.g., todo,in-progress)
+          schema:
+            type: string
+        - name: priority
+          in: query
+          required: false
+          description: Comma-separated list of priorities (e.g., high,medium)
+          schema:
+            type: string
+        - name: assignedToMe
+          in: query
+          required: false
+          description: Filter only tasks assigned to the current user
+          schema:
+            type: boolean
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+      responses:
+        200:
+          description: User tasks fetched successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          allOf:
+                            - $ref: '#/components/schemas/Task'
+                            - type: object
+                              properties:
+                                workspaceId:
+                                  type: object
+                                  properties:
+                                    name:
+                                      type: string
+                      meta:
+                        type: object
+                        properties:
+                          page:
+                            type: integer
+                          limit:
+                            type: integer
+                          totalItems:
+                            type: integer
+                          totalPages:
+                            type: integer
+                  message:
+                    type: string
         401:
           description: Unauthorized
 

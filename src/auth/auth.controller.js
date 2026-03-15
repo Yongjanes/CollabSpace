@@ -102,7 +102,8 @@ const loginUser = async (req, res) => {
                 200,
                 'Login successful',
                 {
-                    accessToken
+                    accessToken,
+                    refreshToken
                 }
             )
         )
@@ -121,7 +122,7 @@ const me = async (req, res) => {
 }
 
 const refreshAccessToken = async (req, res) => {
-    const refreshToken = req.cookies.refresh_token
+    const refreshToken = req.cookies?.refresh_token || req.body?.refreshToken
 
     if (!refreshToken) {
         throw new ApiError(401, 'Refresh token missing')
@@ -135,7 +136,7 @@ const refreshAccessToken = async (req, res) => {
         res.clearCookie('refresh_token')
         throw new ApiError(401, 'Invalid refresh token')
     }
-    
+
     if (decoded.type !== 'refresh') {
         res.clearCookie('refresh_token')
         throw new ApiError(401, 'Invalid token type')
@@ -216,14 +217,15 @@ const refreshAccessToken = async (req, res) => {
                 200,
                 'Token refreshed successfully',
                 {
-                    accessToken: newAccessToken
+                    accessToken: newAccessToken,
+                    refreshToken: newRefreshToken
                 }
             )
         )
 }
 
 const logoutUser = async (req, res) => {
-    const refreshToken = req.cookies?.refresh_token
+    const refreshToken = req.cookies?.refresh_token || req.body?.refreshToken
 
     if (!refreshToken) {
         return res
@@ -263,7 +265,7 @@ const logoutUser = async (req, res) => {
         .status(200)
         .json(
             new ApiResponse(
-                200, 
+                200,
                 'Logged out successfully'
             )
         )

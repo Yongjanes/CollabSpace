@@ -10,8 +10,12 @@ import { requireWorkspaceMember, requireWorkspaceRole } from '../permissions/wor
 
 import { Workspace } from '../models/workspace.model.js'
 import { WorkspaceMember } from '../models/workspaceMember.model.js'
+import { Task } from '../models/task.model.js'
+import { Comment } from '../models/comment.model.js'
+import { ActivityLog } from '../models/activityLog.model.js'
+import { scanAndDelete } from '../utils/cache.js'
 
-const createWorkspace = asyncHandler( async (req, res) => {
+const createWorkspace = asyncHandler(async (req, res) => {
     const { name, description } = req.body
 
     if (!name) {
@@ -32,6 +36,8 @@ const createWorkspace = asyncHandler( async (req, res) => {
     const session = await mongoose.startSession()
     session.startTransaction()
 
+    let newWorkspace = null
+
     try {
         const workspace = await Workspace.create(
             [
@@ -44,7 +50,7 @@ const createWorkspace = asyncHandler( async (req, res) => {
             { session }
         )
 
-        const newWorkspace = workspace[0]
+        newWorkspace = workspace[0]
 
         await WorkspaceMember.create(
             [
@@ -58,38 +64,46 @@ const createWorkspace = asyncHandler( async (req, res) => {
         )
 
         await session.commitTransaction()
-        session.endSession()
-
-        await logActivity({
-            type: 'WORKSPACE_CREATED',
-            actorId: req.user._id,
-            workspaceId: newWorkspace._id,
-            entity: {
-                type: 'workspace',
-                id: newWorkspace._id
-            },
-            metadata: {
-                name: newWorkspace.name
-            }
-        })
-
-        return res
-            .status(201)
-            .json(
-                new ApiResponse(
-                    201,
-                    'Workspace created successfully', 
-                    newWorkspace
-                )
-            )
     } catch (error) {
-        await session.abortTransaction()
-        session.endSession()
+        if (session.inTransaction()) {
+            await session.abortTransaction()
+        }
         throw error
+    } finally {
+        session.endSession()
     }
+
+    // Post-transaction logic
+    await logActivity({
+        type: 'WORKSPACE_CREATED',
+        actorId: req.user._id,
+        workspaceId: newWorkspace._id,
+        entity: {
+            type: 'workspace',
+            id: newWorkspace._id
+        },
+        metadata: {
+            name: newWorkspace.name
+        }
+    })
+
+    console.log("Workspace created:", newWorkspace.name, "ID:", newWorkspace._id);
+
+    return res
+        .status(201)
+        .json(
+            new ApiResponse(
+                201,
+                'Workspace created successfully',
+                {
+                    workspace: newWorkspace,
+                    role: 'owner'
+                }
+            )
+        )
 })
 
-const getMyWorkspaces = asyncHandler( async (req, res) => {
+const getMyWorkspaces = asyncHandler(async (req, res) => {
     // const memberships = await WorkspaceMember.find(
     //     {
     //         userId: req.user._id
@@ -100,10 +114,10 @@ const getMyWorkspaces = asyncHandler( async (req, res) => {
 
     const { page, limit, skip } = getPaginationParams(req.query)
 
-    const [ memberships, totalItems ] = await Promise.all(
+    const [memberships, totalItems] = await Promise.all(
         [
             WorkspaceMember.find({ userId: req.user._id })
-                .populate('workspaceId', 'name description isActive createdAt')
+                .populate('workspaceId', 'name description createdAt')
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit)
@@ -136,7 +150,7 @@ const getMyWorkspaces = asyncHandler( async (req, res) => {
         )
 })
 
-const getWorkspaceById = asyncHandler( async (req, res) => {
+const getWorkspaceById = asyncHandler(async (req, res) => {
     const { id: workspaceId } = req.params
 
     if (!mongoose.Types.ObjectId.isValid(workspaceId)) {
@@ -151,29 +165,33 @@ const getWorkspaceById = asyncHandler( async (req, res) => {
         throw new ApiError(404, 'Workspace not found')
     }
 
+    const responseData = {
+        workspace: workspace,
+        role: member.role
+    }
+
+    console.log("Response for GET /workspaces/:id", JSON.stringify(responseData, null, 2));
+
     return res
         .status(200)
         .json(
             new ApiResponse(
                 200,
                 "Workspace fetched successfully",
-                {
-                    workspace: workspace,
-                    role: member.role
-                }
+                responseData
             )
         )
 })
 
-const updateWorkspace = asyncHandler( async (req, res) => {
+const updateWorkspace = asyncHandler(async (req, res) => {
     const { id: workspaceId } = req.params
-    const { name, description, isActive } = req.body
+    const { name, description } = req.body
 
     if (!mongoose.Types.ObjectId.isValid(workspaceId)) {
         throw new ApiError(400, "Invalid workspace id")
     }
 
-    if (name === undefined && description === undefined && isActive === undefined) {
+    if (name === undefined && description === undefined) {
         throw new ApiError(400, 'At least one field must be provided')
     }
 
@@ -197,15 +215,6 @@ const updateWorkspace = asyncHandler( async (req, res) => {
 
     if (description !== undefined) {
         workspace.description = description
-    }
-
-
-    if (isActive !== undefined) {
-        if (requesterMembership.role !== 'owner') {
-            throw new ApiError(403, 'Only owners can archive a workspace')
-        }
-
-        workspace.isActive = isActive
     }
 
     await workspace.save()
@@ -234,7 +243,7 @@ const updateWorkspace = asyncHandler( async (req, res) => {
         )
 })
 
-const deleteWorkspace  = asyncHandler( async (req, res) => {
+const deleteWorkspace = asyncHandler(async (req, res) => {
     const { id: workspaceId } = req.params
 
     if (!mongoose.Types.ObjectId.isValid(workspaceId)) {
@@ -251,20 +260,47 @@ const deleteWorkspace  = asyncHandler( async (req, res) => {
         throw new ApiError(404, 'Workspace not found')
     }
 
-    if (!workspace.isActive) {
-        throw new ApiError(400, 'Workspace is already archived')
+    const session = await mongoose.startSession()
+    session.startTransaction()
+
+    try {
+        // 1. Delete all comments in the workspace
+        await Comment.deleteMany({ workspaceId }, { session })
+
+        // 2. Delete all tasks in the workspace
+        await Task.deleteMany({ workspaceId }, { session })
+
+        // 3. Delete all activity logs in the workspace
+        await ActivityLog.deleteMany({ workspaceId }, { session })
+
+        // 4. Delete all members of the workspace
+        await WorkspaceMember.deleteMany({ workspaceId }, { session })
+
+        // 5. Delete the workspace itself
+        await Workspace.findByIdAndDelete(workspaceId, { session })
+
+        await session.commitTransaction()
+    } catch (error) {
+        if (session.inTransaction()) {
+            await session.abortTransaction()
+        }
+        throw error
+    } finally {
+        session.endSession()
     }
 
-    workspace.isActive = false
-
-    await workspace.save()
+    // Cache invalidation
+    await Promise.all([
+        scanAndDelete(`tasks:workspace=${workspaceId}:*`),
+        scanAndDelete(`activity:${workspaceId}:*`)
+    ])
 
     return res
         .status(200)
         .json(
             new ApiResponse(
                 200,
-                'Workspace archived successfully',
+                'Workspace and all associated records deleted permanently',
                 {
                     workspaceId: workspaceId
                 }
